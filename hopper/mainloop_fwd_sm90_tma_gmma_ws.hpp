@@ -106,13 +106,24 @@ struct CollectiveMainloopFwdSm90 {
         AtomLayoutQK,
         Layout<Shape<_1, Int<kHeadDimV / 256>, _1>>
     >;
+#ifndef FLASHATTENTION_DISABLE_FP8_TWO_LEVEL_ACCUMULATION
+    // A full 256-column FP32 backup exceeds the paged consumer register budget.
+    // Keep the logical output tile unchanged, but promote smaller MMA N slices.
+    static constexpr bool Use_FP8_PV_Slices = Is_FP8 && MmaPV_is_RS && kHeadDimV == 256
+        && PagedKVNonTMA && !IntraWGOverlap;
+#else
+    static constexpr bool Use_FP8_PV_Slices = false;
+#endif
+    static constexpr int PVMmaN = Use_FP8_PV_Slices ? 128 : kHeadDimV;
+    using TileShape_MNK_PV_Atom = Shape<decltype(get<0>(TileShape_MNK_PV{})), Int<PVMmaN>,
+                                      decltype(get<2>(TileShape_MNK_PV{}))>;
     using TiledMmaPV = decltype(cute::make_tiled_mma(
         std::conditional_t<
             !MmaPV_is_RS,
             decltype(cute::GMMA::ss_op_selector<Element, Element, ElementAccum,
                      TileShape_MNK_PV, GMMA::Major::K, MmaMajorV>()),
             decltype(cute::GMMA::rs_op_selector<Element, Element, ElementAccum,
-                     TileShape_MNK_PV, GMMA::Major::K, MmaMajorV>())
+                     TileShape_MNK_PV_Atom, GMMA::Major::K, MmaMajorV>())
         >{},
         AtomLayoutPV{}));
     using TiledMmaQV = decltype(cute::make_tiled_mma(
@@ -1536,7 +1547,10 @@ struct CollectiveMainloopFwdSm90 {
                 if constexpr (!HasQv) { consumer_wait(pipeline_v, smem_pipe_read); }
                 warp_scheduler_barrier_sync();
                 if constexpr (!MmaPV_use_RS_WG1) {
-                    flash::gemm</*zero_init=*/Is_first_iter, /*wg_wait=*/-1>(tiled_mma_pv, cute::conditional_return<MmaPV_is_RS>(tOrP, tOsP), tOrV(_, _, _, smem_pipe_read.index()), tOrO);
+                    flash::gemm</*zero_init=*/Is_first_iter, /*wg_wait=*/-1, /*SwapAB=*/false,
+                                /*M_slice=*/-1, /*SliceTwoLevel=*/Use_FP8_PV_Slices>(
+                        tiled_mma_pv, cute::conditional_return<MmaPV_is_RS>(tOrP, tOsP),
+                        tOrV(_, _, _, smem_pipe_read.index()), tOrO);
                 } else {
                     TiledMmaPV_RS tiled_mma_pv_rs;
                     flash::gemm</*zero_init=*/Is_first_iter, /*wg_wait=*/-1>(tiled_mma_pv_rs, tOrP, tOrV(_, _, _, smem_pipe_read.index()), tOrO);
