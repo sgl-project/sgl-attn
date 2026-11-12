@@ -1,10 +1,13 @@
 #!/bin/bash
 # Build the sgl-fa3 wheel inside a CUDA-versioned manylinux container.
 #
-# Usage: sgl_fa3/scripts/build.sh <PYTHON_VERSION> <CUDA_VERSION>
+# Usage: sgl_fa3/scripts/build.sh <PYTHON_VERSION> <CUDA_VERSION> <SGLANG_SRC>
 #   PYTHON_VERSION: e.g. 3.11 -- only picks the interpreter that drives the build.
 #                   The wheel is abi3 (cp311-abi3) and serves CPython 3.11+.
 #   CUDA_VERSION:   13.0
+#   SGLANG_SRC:     a checkout of sgl-project/sglang, which owns the build image
+#                   (docker/sgl-fa3.Dockerfile) and the wheel retag script
+#                   (scripts/rename_sgl_fa3_whl.sh).
 #
 # Only x86_64 is built: FA3 targets sm_80/sm_86/sm_90a, and no aarch64 host
 # SGLang serves on (GH200/GB200/GB300) needs it.
@@ -18,13 +21,14 @@
 #            GITHUB_ARTIFACTORY (GitHub mirror for the CUTLASS download).
 set -ex
 
-if [ $# -lt 2 ]; then
-  echo "Usage: $0 <PYTHON_VERSION> <CUDA_VERSION>"
+if [ $# -lt 3 ]; then
+  echo "Usage: $0 <PYTHON_VERSION> <CUDA_VERSION> <SGLANG_SRC>"
   exit 1
 fi
 
 PYTHON_VERSION="$1"
 CUDA_VERSION="$2"
+SGLANG_SRC="$(cd "$3" && pwd)"
 ARCH="x86_64"
 
 case "${CUDA_VERSION}" in
@@ -47,6 +51,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${PKG_DIR}/.." && pwd)"
 PKG_NAME="$(basename "${PKG_DIR}")"
+DOCKERFILE="${SGLANG_SRC}/docker/sgl-fa3.Dockerfile"
+RENAME_SCRIPT="${SGLANG_SRC}/scripts/rename_sgl_fa3_whl.sh"
+for f in "${DOCKERFILE}" "${RENAME_SCRIPT}"; do
+  [ -f "$f" ] || { echo "Missing $f; is ${SGLANG_SRC} an sglang checkout?" >&2; exit 1; }
+done
 
 DEPS_TAG="sgl-fa3-deps:cuda${CUDA_VERSION}-${PY_TAG}-${ARCH}"
 BUILD_JOBS="${BUILD_JOBS:-0}"
@@ -58,11 +67,12 @@ echo "CUDA_VERSION:   ${CUDA_VERSION}"
 echo "CU_TAG:         ${CU_TAG}"
 echo "BASE_IMG:       ${BASE_IMG}"
 echo "PKG_DIR:        ${PKG_DIR}"
+echo "SGLANG_SRC:     ${SGLANG_SRC}"
 echo "BUILD_JOBS:     ${BUILD_JOBS:-auto}"
 echo "----------------------------------------"
 
 docker build \
-  -f "${PKG_DIR}/Dockerfile" "${PKG_DIR}" \
+  -f "${DOCKERFILE}" "$(dirname "${DOCKERFILE}")" \
   --build-arg BASE_IMG="${BASE_IMG}" \
   --build-arg CUDA_VERSION="${CUDA_VERSION}" \
   --build-arg ARCH="${ARCH}" \
@@ -76,7 +86,7 @@ docker build \
 docker run --rm \
   --network=host \
   -v "${REPO_ROOT}:/src" \
-  -v "${SCRIPT_DIR}/rename_whl.sh:/rename_whl.sh:ro" \
+  -v "${RENAME_SCRIPT}:/rename_whl.sh:ro" \
   -w "/src/${PKG_NAME}" \
   -e BUILD_JOBS="${BUILD_JOBS}" \
   -e GITHUB_ARTIFACTORY="${GITHUB_ARTIFACTORY}" \

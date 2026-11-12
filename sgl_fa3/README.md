@@ -4,9 +4,10 @@ The FlashAttention-3 forward kernels [SGLang](https://github.com/sgl-project/sgl
 serves with, packaged as a standalone wheel. Until this package existed they
 were compiled into `sglang-kernel` as `sgl_kernel.flash_ops`.
 
-The kernels come from `../hopper` in this repository; this directory holds only
-the torch op registration, the Python wrapper, the tests and the build and
-release scripts.
+The kernels come from `../hopper` in this repository; this directory holds the
+torch op registration, the Python wrapper, the tests and the wheel build script.
+The build image, the wheel retag script and the release index script live in
+sgl-project/sglang, next to those of the other SGLang-built wheels.
 
 ## What is built
 
@@ -30,10 +31,12 @@ The ops are registered as `torch.ops.sgl_fa3.fwd` and
 ## Building
 
 ```bash
-sgl_fa3/scripts/build.sh 3.11 13.0
+sgl_fa3/scripts/build.sh 3.11 13.0 /path/to/sglang
 ```
 
-builds in a `pytorch/manylinux2_28-builder:cuda13.0` container and writes
+builds in a `pytorch/manylinux2_28-builder:cuda13.0` container (image from
+sglang's `docker/sgl-fa3.Dockerfile`, retagged with sglang's
+`scripts/rename_sgl_fa3_whl.sh`) and writes
 `sgl_fa3/dist/` (`+cu130` wheel for the sgl-whl index) and
 `sgl_fa3/dist-pypi/` (same wheel without the local version, for PyPI). The
 build reads `../hopper`, so it needs a full checkout; an sdist is not supported.
@@ -50,4 +53,4 @@ Releases are cut by the `Release sgl-fa3` workflow in sgl-project/sglang
 (`.github/workflows/release-whl-fa3.yml`). It checks out this branch, writes the
 version into `python/sgl_fa3/_version.py`, runs `scripts/build.sh`, tests the
 wheel on H200 with `tests/`, then publishes to PyPI and the
-sgl-project/whl index (`scripts/update_whl_index.py`).
+sgl-project/whl index (sglang's `scripts/update_fa3_whl_index.py`).

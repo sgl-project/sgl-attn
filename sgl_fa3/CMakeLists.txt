@@ -1,6 +1,6 @@
 # sgl-fa3: the FlashAttention-3 forward kernels SGLang serves with, packaged as a
-# standalone wheel. The kernels are compiled from ../hopper; this directory only
-# holds the torch op registration, the Python wrapper and the build/release logic.
+# standalone wheel. The kernels are compiled from ../hopper; this directory
+# holds the torch op registration, the Python wrapper, the tests and build.sh.
 #
 # The compile configuration mirrors what sglang-kernel built as `flash_ops`
 # before FA3 moved out of it, so the kernels are the same: forward only, varlen
