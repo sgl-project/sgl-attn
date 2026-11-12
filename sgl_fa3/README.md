@@ -15,7 +15,7 @@ sgl-project/sglang, next to those of the other SGLang-built wheels.
   `FLASHATTENTION_VARLEN_ONLY`); sparse mask kernels off by default.
 - `sm_90a`, plus `sm_80`/`sm_86` (A100, A10, L40, 4090). No SM100+ targets.
 - BF16, FP16 and FP8 (E4M3).
-- x86_64 Linux, CUDA 13.0 (`+cu130`), one abi3 wheel for CPython 3.11+.
+- x86_64 Linux, CUDA 13.0 (`+cu130`), one abi3 wheel for CPython 3.10+.
 - Pinned to `torch==2.14.1`: the extension uses the regular torch C++ ABI, so
   a release only loads against the torch it was built with.
 
@@ -31,7 +31,7 @@ The ops are registered as `torch.ops.sgl_fa3.fwd` and
 ## Building
 
 ```bash
-sgl_fa3/scripts/build.sh 3.11 13.0 /path/to/sglang
+sgl_fa3/scripts/build.sh 3.10 13.0 /path/to/sglang
 ```
 
 builds in a `pytorch/manylinux2_28-builder:cuda13.0` container (image from
