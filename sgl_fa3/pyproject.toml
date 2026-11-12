@@ -1,0 +1,38 @@
+[build-system]
+requires = [
+  "scikit-build-core>=0.10",
+  "torch==2.14.1",
+  "wheel",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "sgl-fa3"
+dynamic = ["version"]
+description = "FlashAttention-3 forward kernels packaged for SGLang"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "BSD-3-Clause" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: BSD License",
+  "Environment :: GPU :: NVIDIA CUDA",
+]
+# The extension uses the regular (non-stable) torch C++ ABI, so it only loads
+# against the torch it was built with. Bump together with SGLang's torch pin.
+dependencies = ["torch==2.14.1"]
+
+[project.urls]
+"Homepage" = "https://github.com/sgl-project/sgl-flash-attn/tree/sgl-kernel/sgl_fa3"
+"Bug Tracker" = "https://github.com/sgl-project/sglang/issues"
+
+[tool.scikit-build]
+cmake.build-type = "Release"
+minimum-version = "build-system.requires"
+wheel.py-api = "cp311"
+wheel.license-files = []
+wheel.packages = ["python/sgl_fa3"]
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "python/sgl_fa3/_version.py"
