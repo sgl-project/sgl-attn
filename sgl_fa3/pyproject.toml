@@ -11,7 +11,7 @@ name = "sgl-fa3"
 dynamic = ["version"]
 description = "FlashAttention-3 forward kernels packaged for SGLang"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "BSD-3-Clause" }
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -29,7 +29,7 @@ dependencies = ["torch==2.14.1"]
 [tool.scikit-build]
 cmake.build-type = "Release"
 minimum-version = "build-system.requires"
-wheel.py-api = "cp311"
+wheel.py-api = "cp310"
 wheel.license-files = []
 wheel.packages = ["python/sgl_fa3"]
 

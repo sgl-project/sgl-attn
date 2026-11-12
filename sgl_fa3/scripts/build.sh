@@ -2,8 +2,8 @@
 # Build the sgl-fa3 wheel inside a CUDA-versioned manylinux container.
 #
 # Usage: sgl_fa3/scripts/build.sh <PYTHON_VERSION> <CUDA_VERSION> <SGLANG_SRC>
-#   PYTHON_VERSION: e.g. 3.11 -- only picks the interpreter that drives the build.
-#                   The wheel is abi3 (cp311-abi3) and serves CPython 3.11+.
+#   PYTHON_VERSION: e.g. 3.10 -- only picks the interpreter that drives the build.
+#                   The wheel is abi3 (cp310-abi3) and serves CPython 3.10+.
 #   CUDA_VERSION:   13.0
 #   SGLANG_SRC:     a checkout of sgl-project/sglang, which owns the build image
 #                   (docker/sgl-fa3.Dockerfile) and the wheel retag script
