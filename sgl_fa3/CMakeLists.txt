@@ -126,6 +126,10 @@ file(GLOB FA3_FP16_GEN_SRCS
 file(GLOB FA3_FP8_GEN_SRCS
     "${FA3_INSTANTIATIONS}/flash_fwd_hdim[0-9]*_e4m3*_sm90.cu")
 
+# Q/K 64 with V 256 has no SGLang caller (absorbed MLA is V 512); FLASHATTENTION_DISABLE_HDIMDIFF64_256 below.
+list(FILTER FA3_BF16_GEN_SRCS EXCLUDE REGEX "flash_fwd_hdim64_256_")
+list(FILTER FA3_FP16_GEN_SRCS EXCLUDE REGEX "flash_fwd_hdim64_256_")
+
 set(SGL_FA3_SOURCES
     "csrc/fa3_extension.cc"
     "${SGL_FA3_HOPPER_DIR}/flash_prepare_scheduler.cu"
@@ -149,11 +153,18 @@ target_include_directories(_C PRIVATE
 )
 target_link_libraries(_C PRIVATE ${TORCH_LIBRARIES} c10 cuda)
 
+# Variants SGLang never reaches are compiled out; calls that would need one fail with a
+# TORCH_CHECK in mha_fwd instead of silently running something else.
 set(SGL_FA3_COMPILE_DEFS
     FLASHATTENTION_DISABLE_BACKWARD
     FLASHATTENTION_DISABLE_DROPOUT
     FLASHATTENTION_DISABLE_UNEVEN_K
-    FLASHATTENTION_VARLEN_ONLY
+    # No caller passes new K/V (or rotary) to flash_attn_with_kvcache; SGLang writes the KV cache itself.
+    FLASHATTENTION_DISABLE_APPENDKV
+    # Only multimodal_gen calls FA3 without cu_seqlens/seqused (for the static persistent
+    # scheduler and 2-CTA clusters), always unsplit, non-paged and without softcap.
+    FLASHATTENTION_VARLEN_ONLY_SPLIT_PAGED_SOFTCAP
+    FLASHATTENTION_DISABLE_HDIMDIFF64_256
 )
 if (NOT SGL_FA3_ENABLE_SM8X)
     list(APPEND SGL_FA3_COMPILE_DEFS FLASHATTENTION_DISABLE_SM8x)

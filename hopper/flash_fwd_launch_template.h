@@ -217,7 +217,14 @@ void run_mha_fwd_(Flash_fwd_params &params, cudaStream_t stream) {
     CAUSAL_LOCAL_SWITCH(params.is_causal, params.is_local, Is_causal, Is_local, [&] {
         VCOLMAJOR_SWITCH(params.v_dim_stride != 1, V_colmajor_, [&] {
             static constexpr bool V_colmajor = V_colmajor_ && sizeof(T) == 1;
-            VARLEN_SWITCH(params.cu_seqlens_q || params.cu_seqlens_k || params.seqused_q || params.seqused_k || params.leftpad_k, Varlen, [&] {
+            VARLEN_SWITCH(params.cu_seqlens_q || params.cu_seqlens_k || params.seqused_q || params.seqused_k || params.leftpad_k, Varlen_, [&] {
+                #ifdef FLASHATTENTION_VARLEN_ONLY_SPLIT_PAGED_SOFTCAP
+                // Split, non-TMA paged and softcap kernels are built for varlen only; mha_fwd turns
+                // dense calls that need them into varlen ones with a full-length seqused_k.
+                static constexpr bool Varlen = Varlen_ || Split || PagedKVNonTMA || Has_softcap;
+                #else
+                static constexpr bool Varlen = Varlen_;
+                #endif
                 BOOL_SWITCH(use_one_mma_wg(params), Use_one_mma_wg_, [&] {
                     // Only enable for headdim 64/128 on Hopper with same Q/K and V headdim
                     static constexpr bool Use_one_mma_wg = Use_one_mma_wg_ && Arch >= 90 && (kHeadDim == 128 || kHeadDim == 64) && (kHeadDimV == kHeadDim);

@@ -246,9 +246,12 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
                 if constexpr (Arch == 90) {
                     if (params.dv > 256) {
                         return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    } else if (params.dv > 64) {
+                    }
+                    #ifndef FLASHATTENTION_DISABLE_HDIMDIFF64_256
+                    else if (params.dv > 64) {
                         return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                     }
+                    #endif
                 }
                 #endif
                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
@@ -283,9 +286,12 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
                 if constexpr (Arch == 90) {
                     if (params.dv > 256) {
                         return run_mha_fwd_<Arch, cutlass::half_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    } else if (params.dv > 64) {
+                    }
+                    #ifndef FLASHATTENTION_DISABLE_HDIMDIFF64_256
+                    else if (params.dv > 64) {
                         return run_mha_fwd_<Arch, cutlass::half_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                     }
+                    #endif
                 }
                 #endif
                 return run_mha_fwd_<Arch, cutlass::half_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
@@ -779,6 +785,10 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
                    "If V headdim is different from Q/K dim, we only support Q/K headdim in (128, 192] and V headdim in (96, 128], "
                    "or (Q/K <= 64 and V <= 512).");
         TORCH_CHECK(dprops->major == 9, "Only Hopper supports different V headdim");
+        #ifdef FLASHATTENTION_DISABLE_HDIMDIFF64_256
+        TORCH_CHECK(!(head_size <= 64 && head_size_v > 64 && head_size_v <= 256),
+                    "This flash attention build does not support Q/K headdim <= 64 with V headdim in (64, 256].");
+        #endif
         if (head_size_v > 256) {
             TORCH_CHECK(q_type == at::ScalarType::Half || q_type == at::ScalarType::BFloat16,
                         "HeaddimV > 256 requires fp16 and bf16 data type");
@@ -818,6 +828,15 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         CHECK_SHAPE(v, num_pages, page_size, num_heads_k, head_size_v);
         CHECK_SHAPE(page_table, batch_size_k, max_num_pages_per_seq);
     }
+
+    #ifdef FLASHATTENTION_VARLEN_ONLY_SPLIT_PAGED_SOFTCAP
+    // Those kernels are only built for varlen, so a dense call that may need them gets a
+    // full-length seqused_k: same result, and the scheduler setup below sees it as varlen.
+    if (!is_varlen_q && !is_varlen_k && !seqused_q_.has_value() && !seqused_k_.has_value()
+        && !leftpad_k_.has_value() && (paged_KV || softcap > 0.0 || num_splits != 1)) {
+        seqused_k_ = torch::full({batch_size}, seqlen_k, q.options().dtype(torch::kInt32));
+    }
+    #endif
 
     if (seqused_q_.has_value()){
         auto seqused_q = seqused_q_.value();
@@ -1171,6 +1190,10 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     #endif
     #ifdef FLASHATTENTION_DISABLE_APPENDKV
     TORCH_CHECK(!k_new_.has_value(), "This flash attention build does not support appending KV.");
+    #endif
+    #ifdef FLASHATTENTION_VARLEN_ONLY_SPLIT_PAGED_SOFTCAP
+    TORCH_CHECK(is_varlen || (params.num_splits == 1 && !(params.page_table && !params.pagedkv_tma) && params.softcap == 0.0),
+                "This flash attention build only supports split, paged and softcap attention in varlen mode.");
     #endif
 
     // Handle sparse mask for Masked MHA (topk-based sparse attention)
