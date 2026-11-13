@@ -108,20 +108,23 @@ if (SGL_FA3_ENABLE_SM8X)
         "-gencode=arch=compute_86,code=sm_86"
     )
     file(GLOB FA3_SM8X_GEN_SRCS "${FA3_INSTANTIATIONS}/flash_fwd_hdim*_sm80.cu")
+    # Each *_softcapall_sm80.cu only #includes the per-softcap files that this glob
+    # already selects, so compiling it as well would build those kernels twice.
+    list(FILTER FA3_SM8X_GEN_SRCS EXCLUDE REGEX "_softcapall_sm80\\.cu$")
 endif()
 
+# The flash_fwd_hdimdiff_*_sm90.cu files only #include the flash_fwd_hdim{64_256,64_512,192_128}_*
+# files, which the flash_fwd_hdim[0-9]* globs below already select. Do not add them, or those
+# kernels are compiled and linked twice.
 file(GLOB FA3_BF16_GEN_SRCS
-    "${FA3_INSTANTIATIONS}/flash_fwd_hdim[0-9]*_bf16*_sm90.cu"
-    "${FA3_INSTANTIATIONS}/flash_fwd_hdimdiff_bf16*_sm90.cu")
+    "${FA3_INSTANTIATIONS}/flash_fwd_hdim[0-9]*_bf16*_sm90.cu")
 
 # FP16: individual hdim files instead of hdimall, which crashes ptxas.
 file(GLOB FA3_FP16_GEN_SRCS
-    "${FA3_INSTANTIATIONS}/flash_fwd_hdim[0-9]*_fp16*_sm90.cu"
-    "${FA3_INSTANTIATIONS}/flash_fwd_hdimdiff_fp16*_sm90.cu")
+    "${FA3_INSTANTIATIONS}/flash_fwd_hdim[0-9]*_fp16*_sm90.cu")
 
 file(GLOB FA3_FP8_GEN_SRCS
-    "${FA3_INSTANTIATIONS}/flash_fwd_hdim[0-9]*_e4m3*_sm90.cu"
-    "${FA3_INSTANTIATIONS}/flash_fwd_hdimdiff_e4m3*_sm90.cu")
+    "${FA3_INSTANTIATIONS}/flash_fwd_hdim[0-9]*_e4m3*_sm90.cu")
 
 set(SGL_FA3_SOURCES
     "csrc/fa3_extension.cc"
