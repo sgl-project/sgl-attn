@@ -48,7 +48,7 @@ DISABLE_BACKWARD = True
 
 DISABLE_SPLIT = False
 DISABLE_PAGEDKV = True
-DISABLE_APPENDKV = False
+DISABLE_APPENDKV = True  # FLASHATTENTION_DISABLE_APPENDKV
 DISABLE_LOCAL = False
 DISABLE_SOFTCAP = True
 DISABLE_PACKGQA = False
@@ -580,7 +580,8 @@ def test_flash_attn_kvcache(
     nheads_k = nheads if mha_type == "mha" else (1 if mha_type == "mqa" else 3)
     assert nheads % nheads_k == 0
     dtype_ref = torch.bfloat16 if dtype == torch.float8_e4m3fn else dtype
-    dv_vals = [128, d] if d > 128 and d <= 192 else ([256, 512, d] if d <= 64 else [d])
+    # sgl-fa3 builds Q/K 64 with V 512 only (FLASHATTENTION_DISABLE_HDIMDIFF64_256).
+    dv_vals = [128, d] if d > 128 and d <= 192 else ([512, d] if d <= 64 else [d])
 
     if has_sink:
         sinks = torch.randn(nheads, dtype=torch.bfloat16, device=device)
@@ -1120,7 +1121,8 @@ def test_flash_attn_varlen_output(
     # nheads = 1
     nheads_kv = nheads if mha_type == "mha" else (2 if mha_type == "gqa" else 1)
     dtype_ref = torch.bfloat16 if dtype == torch.float8_e4m3fn else dtype
-    dv_vals = [128, d] if d > 128 and d <= 192 else ([256, 512, d] if d <= 64 else [d])
+    # sgl-fa3 builds Q/K 64 with V 512 only (FLASHATTENTION_DISABLE_HDIMDIFF64_256).
+    dv_vals = [128, d] if d > 128 and d <= 192 else ([512, d] if d <= 64 else [d])
     if dtype == torch.float8_e4m3fn:
         dv_vals = [d]
     for dv in dv_vals:

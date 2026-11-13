@@ -11,8 +11,15 @@ sgl-project/sglang, next to those of the other SGLang-built wheels.
 
 ## What is built
 
-- Forward only, varlen only (`FLASHATTENTION_DISABLE_BACKWARD`,
-  `FLASHATTENTION_VARLEN_ONLY`); sparse mask kernels off by default.
+- Forward only (`FLASHATTENTION_DISABLE_BACKWARD`); sparse mask kernels off by default.
+- Only the variants SGLang reaches, so the wheel stays under PyPI's file size limit:
+  - no append-KV / rotary path (`FLASHATTENTION_DISABLE_APPENDKV`): SGLang writes the KV cache itself;
+  - split, non-TMA paged and softcap kernels for varlen only
+    (`FLASHATTENTION_VARLEN_ONLY_SPLIT_PAGED_SOFTCAP`); a dense call that needs one is run as
+    varlen with a full-length `seqused_k`, which gives the same result;
+  - no Q/K 64 with V 256 (`FLASHATTENTION_DISABLE_HDIMDIFF64_256`); absorbed MLA uses V 512.
+
+  Calls that need a compiled-out variant raise instead of running something else.
 - `sm_90a`, plus `sm_80`/`sm_86` (A100, A10, L40, 4090). No SM100+ targets.
 - BF16, FP16 and FP8 (E4M3).
 - x86_64 Linux, CUDA 13.0 (`+cu130`), one abi3 wheel for CPython 3.10+.
